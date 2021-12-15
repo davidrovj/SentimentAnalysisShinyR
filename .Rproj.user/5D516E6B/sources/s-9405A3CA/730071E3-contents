@@ -1,0 +1,152 @@
+loadLibraries()
+tweets <- sentiment_analysis("@karymeibacruz","@ImAmarilisCas")
+print(tweets[1])
+print(tweets[2])
+print(tweets[3])
+print(tweets[4])
+print(tweets[5])
+print(tweets[6])
+
+sentiment_analysis <- function(user1, user2){
+  # user1 <- "@JoeBiden"
+  # user2 <- "@BernieSanders"
+  
+  user1clean <- str_replace(user1, "@", "")
+  user2clean <- str_replace(user2, "@", "")
+  
+  tema_graf <-
+    theme_minimal() +
+    theme(text = element_text(family = "serif"),
+          panel.grid.minor = element_blank(),
+          strip.background = element_rect(fill = "#EBEBEB", colour = NA),
+          legend.position = "none",
+          legend.box.background = element_rect(fill = "#EBEBEB", colour = NA))
+  
+   token <- create_token(
+      app = "Practica1",
+      consumer_key = "38H8QSJBnY9xryxqkDshoBi7Q",
+      consumer_secret = "78ZGozfvlcJzY3IclARTdMtSEGCkxcb5QLyBRUWm4MRv3WR2x5",
+      access_token = "1442475234913775619-2l5DmYvGVlXFYNbV4J6B5IpinNf9Nd",
+      access_secret = "103NKYZidMCRkysiPXFNKg3wKNDfxwBKiTL9HlI4Quru3"
+    )
+  
+  # token <- create_token(
+  #   app = "Practica1",
+  #   consumer_key = "I3vOd8YnGdjCHLixAv9MnrZfg",
+  #   consumer_secret = "AFGGNIqtuMHzH6QBVXPw84UOYxwaQdmIHET6tcbX1YprZvbxYw",
+  #   access_token = "712134627888992256-B6Vbp2bEQ0LjwTWksE6oHXWVxRjLch5",
+  #   access_secret = "X00rSqIdvec8yA0yufnAgf3AVCSsLMgxTOutbF7cIHnc7"
+  # )
+  
+  datos_new <- get_timeline(user=user2,
+                            n = 500,
+                            parse = TRUE,
+                            check = FALSE,
+                            include_rts = FALSE)
+  datos_new2 <- get_timeline(user=user1,
+                             n = 500, 
+                             parse = TRUE, 
+                             check = TRUE, 
+                             include_rts = FALSE)
+  
+  
+  tweets1 <- bind_rows(datos_new, datos_new2)
+  # Mostrar el total de tweets extraídos 
+  resumen <- tweets1 %>% group_by("screen_name") %>% summarise(numero_tweets = n()); resumen
+  # Seleccionar y renombrar columnas
+  tweets1 <- tweets1 %>% select(screen_name, created_at, status_id, text)
+  tweets1 <- tweets1 %>% rename(autor = screen_name, fecha = created_at, texto = text, tweet_id = status_id)
+  
+  tweets1
+  # tokenización a cada tweet
+  tweets1 <- tweets1 %>% mutate(texto_tokenizado = map(.x = texto, .f = limpiar_tokenizar))
+  tweets1 %>% select(texto_tokenizado) %>% head()
+  
+  tweets_tidy <- tweets1 %>% select(-texto) %>% unnest(cols = c(texto_tokenizado))
+  tweets_tidy <- tweets_tidy %>% rename(token = texto_tokenizado)
+  
+  plotTWDate <- ggplot(tweets1, aes(x = as.Date(fecha), fill = autor)) +
+    geom_histogram(position = "identity", bins = 20, show.legend = FALSE) +
+    scale_x_date(date_labels = "%m-%Y", date_breaks = "2 week") +
+    labs(x = "Posting Date", y = "Number of tweets") +
+    facet_wrap(~ autor, ncol = 1) + theme_bw() + theme(axis.text.x = element_text(angle = 90))
+  
+  plotTWDate
+  
+  tweets_mes_anyo <- tweets1 %>% mutate(mes_anyo = format(fecha, "%Y-%m"))
+  tweets_mes_anyo <- tweets_mes_anyo %>% group_by(autor, mes_anyo) %>% summarise(n = n()) %>% ggplot(aes(x = mes_anyo, y = n, color 
+                                                                                                         = autor)) +
+    geom_line(aes(group = autor)) +
+    labs(title = "Amount of posted tweets", x = "Posting Date",
+         y = "Number of tweets") + theme_bw() +
+    theme(axis.text.x = element_text(angle = 90, size = 6),
+          legend.position = "bottom")
+  
+  
+  tweets_mes_anyo
+  
+  # 3) Conteo de palabras por usuario: 
+  tweets_tidy %>% group_by(autor) %>% summarise(n = n()) 
+  wordCount <- tweets_tidy %>% ggplot(aes(x = autor)) + geom_bar() + coord_flip() + theme_bw()
+  
+  tweets_tidy %>% select(autor, token) %>% distinct() %>% group_by(autor) %>% summarise(palabras_distintas = n()) 
+  wordCountDist <- tweets_tidy %>% select(autor, token) %>% distinct() %>%
+    ggplot(aes(x = autor)) + geom_bar() + coord_flip() + theme_bw()
+  
+  
+  require(sm)
+  
+  lista_stopwords <- stopwords("spanish")
+  # Se añade el término amp al listado de stopwords
+  lista_stopwords <- c(lista_stopwords, "amp")
+  lista_stopwords
+  
+  
+  #5) Correlación entre usuarios por palabras utilizadas:
+  tweets_spread <- tweets_tidy %>% group_by(autor, token) %>% count(token) %>%
+    spread(key = autor, value = n, fill = NA, drop = TRUE)
+  tweets_spread
+  
+  
+  coluser1 <- pull(tweets_spread, user1clean)   
+  coluser1
+  
+  coluser2 <- pull(tweets_spread, user2clean)
+  coluser2
+  
+  cor.test(~ coluser1 + coluser2, method = "pearson", data = tweets_spread)
+  
+  p1 <- ggplot(tweets_spread, aes(coluser1, coluser2)) + geom_jitter(alpha = 0.1, size = 2.5, width = 0.25, 
+                                                                          height = 0.25) + geom_text(aes(label = token), check_overlap = TRUE, vjust = 1.5) + 
+    scale_x_log10(labels = percent_format()) + scale_y_log10(labels = percent_format()) +
+    geom_abline(color = "red") + theme_bw() + theme(axis.text.x = element_blank(),
+                                                    axis.text.y = element_blank())
+  
+  p1
+  
+  # 6) Conteo de palabras comunes entre dos usuarios: 
+  palabras_comunes <- dplyr::intersect(tweets_tidy %>% filter(autor=="BernieSanders") %>%
+                                         select(token), tweets_tidy %>% filter(autor=="JoeBiden") %>%
+                                         select(token)) %>% nrow()
+  
+  paste("Número de palabras comunes entre ", user1clean," y ",user2clean, " = ",palabras_comunes)
+  
+  
+  
+  return(list(plotTWDate, tweets_mes_anyo, wordCount, wordCountDist, p1, palabras_comunes))
+}
+
+limpiar_tokenizar <- function(texto){
+  nuevo_texto <- tolower(texto) # 1
+  # de cualquier cosa que no sea un espacio)
+  nuevo_texto <- str_replace_all(nuevo_texto,"http\\S*", "") # 2
+  nuevo_texto <- str_replace_all(nuevo_texto,"[[:punct:]]", " ") # 3
+  nuevo_texto <- str_replace_all(nuevo_texto,"[[:digit:]]", " ") # 4
+  nuevo_texto <- str_replace_all(nuevo_texto,"[\\s]+", " ") # 5
+  nuevo_texto <- str_replace_all(nuevo_texto, "[\\U0001f100-\\U0001ffff]", " ")#emojis
+  nuevo_texto <- str_replace_all(nuevo_texto, "[\\u200D-\\u2fff]", " ")#emojis
+  nuevo_texto <- str_split(nuevo_texto, " ")[[1]] #6
+  nuevo_texto <- keep(.x = nuevo_texto, .p = function(x){str_length(x) > 1})
+  return(nuevo_texto)
+}
+
