@@ -65,8 +65,9 @@ server <- function(input, output) {
     observe({if(input$analyze > 0){
                result$user1 <- isolate(as.character(input$user1))
                result$user2 <- isolate(as.character(input$user2))
+               result$idiom <- isolate(as.character(input$stopwords))
                
-               result$tweets <- sentiment_analysis(result$user1,result$user2)
+               result$tweets <- sentiment_analysis(result$user1,result$user2,result$idiom)
             }
     })
     output$corr <- renderPlot({result$tweets[5]})

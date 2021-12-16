@@ -7,9 +7,10 @@ print(tweets[4])
 print(tweets[5])
 print(tweets[6])
 
-sentiment_analysis <- function(user1, user2){
-  # user1 <- "@JoeBiden"
-  # user2 <- "@BernieSanders"
+sentiment_analysis <- function(user1, user2, lang){
+  user1 <- "@JoeBiden"
+  user2 <- "@BernieSanders"
+  lang <- "english"
   
   user1clean <- str_replace(user1, "@", "")
   user2clean <- str_replace(user2, "@", "")
@@ -23,20 +24,12 @@ sentiment_analysis <- function(user1, user2){
           legend.box.background = element_rect(fill = "#EBEBEB", colour = NA))
   
    token <- create_token(
-      app = "Practica1",
-      consumer_key = "38H8QSJBnY9xryxqkDshoBi7Q",
-      consumer_secret = "78ZGozfvlcJzY3IclARTdMtSEGCkxcb5QLyBRUWm4MRv3WR2x5",
-      access_token = "1442475234913775619-2l5DmYvGVlXFYNbV4J6B5IpinNf9Nd",
-      access_secret = "103NKYZidMCRkysiPXFNKg3wKNDfxwBKiTL9HlI4Quru3"
+      app = "____",
+      consumer_key = "____",
+      consumer_secret = "____",
+      access_token = "____",
+      access_secret = "_____"
     )
-  
-  # token <- create_token(
-  #   app = "Practica1",
-  #   consumer_key = "I3vOd8YnGdjCHLixAv9MnrZfg",
-  #   consumer_secret = "AFGGNIqtuMHzH6QBVXPw84UOYxwaQdmIHET6tcbX1YprZvbxYw",
-  #   access_token = "712134627888992256-B6Vbp2bEQ0LjwTWksE6oHXWVxRjLch5",
-  #   access_secret = "X00rSqIdvec8yA0yufnAgf3AVCSsLMgxTOutbF7cIHnc7"
-  # )
   
   datos_new <- get_timeline(user=user2,
                             n = 500,
@@ -96,7 +89,7 @@ sentiment_analysis <- function(user1, user2){
   
   require(sm)
   
-  lista_stopwords <- stopwords("spanish")
+  lista_stopwords <- stopwords(lang)
   # Se añade el término amp al listado de stopwords
   lista_stopwords <- c(lista_stopwords, "amp")
   lista_stopwords
@@ -124,12 +117,92 @@ sentiment_analysis <- function(user1, user2){
   
   p1
   
+  
   # 6) Conteo de palabras comunes entre dos usuarios: 
-  palabras_comunes <- dplyr::intersect(tweets_tidy %>% filter(autor=="BernieSanders") %>%
-                                         select(token), tweets_tidy %>% filter(autor=="JoeBiden") %>%
+  palabras_comunes <- dplyr::intersect(tweets_tidy %>% filter(autor==user1clean) %>%
+                                         select(token), tweets_tidy %>% filter(autor==user2clean) %>%
                                          select(token)) %>% nrow()
   
   paste("Número de palabras comunes entre ", user1clean," y ",user2clean, " = ",palabras_comunes)
+  
+  
+  
+  
+  
+  # 7) Comparación en el uso de palabras:
+  
+  # a) Pivotaje y despivotaje
+  tweets_spread <- tweets_tidy %>% group_by(autor, token) %>% count(token) %>% spread(key = autor, value = n, fill = 0, drop = TRUE)
+  tweets_unpivot <- tweets_spread %>% gather(key = "autor", value = "n", -token)
+  
+  # b) Selección de los autores Joe Biden y Bernie Sanders
+  tweets_unpivot <- tweets_unpivot %>% 
+    filter(autor %in% c(user1clean, user2clean))
+  
+  # c) Se añade el total de palabras de cada autor
+  tweets_unpivot <- tweets_unpivot %>% left_join(tweets_tidy %>% group_by(autor) 
+                                                 %>%summarise(N = n()), by = "autor")
+  tweets_unpivot
+  # d) Cálculo de odds y log of odds de cada palabra
+  tweets_logOdds <- tweets_unpivot %>% mutate(odds = (n + 1) / (N + 1))
+  
+  tweets_logOdds
+  
+  tweets_logOdds <- tweets_logOdds %>% select(autor, token, odds) %>% spread(key = autor, value = odds)
+  tweets_logOdds
+  
+  # 
+  coluser1 <- tweets_logOdds[user1clean] 
+  coluser1
+  # 
+  coluser2 <- tweets_logOdds[user2clean]
+  coluser2
+  
+  head(log(coluser1/coluser2))
+  # col3<-coluser1/coluser2
+  # col3%>% 
+  #   rename(
+  #      "log_odds" = "JoeBiden"
+  #   )
+  # 
+  # head(col3)
+  # names(col3)
+  # logOddscol <- log(col3)
+  # logOddscol
+  # # probarLog <- tweets_logOdds["JoeBiden"]/tweets_logOdds["BernieSanders"]
+  # # funcionLog <- log(probarLog)
+  # tweets_logOdds$log_odds <- logOddscol 
+  # tweets_logOdds$abs_log_odds <- abs(logOddscol)
+  # 
+  # names(tweets_logOdds)
+  
+  
+  
+  
+  tweets_logOdds <- tweets_logOdds %>%
+    mutate(log_odds = log(coluser1/coluser2), abs_log_odds = abs(log_odds))
+  
+  tweets_logOdds
+  tweets_logOdds <- tweets_logOdds %>% mutate(autor_frecuente = if_else(log_odds > 0,
+                                                                        user1,user2))
+  tweets_logOdds %>% arrange(desc(abs_log_odds)) %>% head() 
+  a <- tweets_logOdds %>% group_by(autor_frecuente) %>% top_n(15, abs_log_odds)
+  
+  # e) Graficar resultados
+  ggplot(a,aes(x = reorder(token, log_odds), y = log_odds, fill = autor_frecuente)) + 
+    geom_col() + labs(x = "word", y = "log odds ratio") +
+    coord_flip() + theme_bw()
+  
+  # f) Representación gráfica de las frecuencias
+  tweets_tidy %>% group_by(autor, token) %>% count(token) %>% group_by(autor) %>%
+    top_n(10, n) %>% arrange(autor, desc(n)) %>%
+    ggplot(aes(x = reorder(token,n), y = n, fill = autor)) +
+    geom_col() +
+    theme_bw() +
+    labs(y = "", x = "") +
+    theme(legend.position = "none") +
+    coord_flip() +
+    facet_wrap(~autor,scales = "free", ncol = 1, drop = TRUE)
   
   
   
