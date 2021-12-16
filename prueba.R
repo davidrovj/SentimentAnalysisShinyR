@@ -1,5 +1,5 @@
 loadLibraries()
-tweets <- sentiment_analysis("@karymeibacruz","@ImAmarilisCas")
+tweets <- sentiment_analysis("@","@")
 print(tweets[1])
 print(tweets[2])
 print(tweets[3])
