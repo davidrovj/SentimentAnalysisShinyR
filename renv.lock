@@ -1087,6 +1087,13 @@
       "Repository": "CRAN",
       "Hash": "5be9fcf8ef6763e8cb13ab009e273a1d"
     },
+    "textdata": {
+      "Package": "textdata",
+      "Version": "0.4.1",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "216c2b99ec77772ab298d7e205f9046d"
+    },
     "tibble": {
       "Package": "tibble",
       "Version": "3.1.6",
@@ -1240,6 +1247,13 @@
       "Source": "Repository",
       "Repository": "CRAN",
       "Hash": "dddb6538141ed1e2435cb63c6c748d16"
+    },
+    "wordcloud2": {
+      "Package": "wordcloud2",
+      "Version": "0.2.1",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "10274bd096f5c2ad7471ea0eea0c1424"
     },
     "xfun": {
       "Package": "xfun",
